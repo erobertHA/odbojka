@@ -56,12 +56,34 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+
+type ToastState = {
+  message: string
+  type: 'success' | 'error'
+} | null
+
+function Toast({toast, onClose}: {toast: ToastState, onClose: () => void}) {
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(onClose, 3000)
+    return () => window.clearTimeout(timer)
+  }, [toast, onClose])
+
+  if (!toast) return null
+
+  return (
+    <div className={`toast ${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}>
+      {toast.message}
+    </div>
+  )
+}
+
 function PublicPage() {
   const [event, setEvent] = useState<EventItem | null | undefined>(undefined)
   const [name, setName] = useState(localStorage.getItem('volleyball_name') || '')
   const [status, setStatus] = useState<RSVPStatus>('playing')
   const [note, setNote] = useState('')
-  const [message, setMessage] = useState('')
+  const [toast, setToast] = useState<ToastState>(null)
   const [busy, setBusy] = useState(false)
 
   async function load() {
@@ -111,7 +133,7 @@ function PublicPage() {
     e.preventDefault()
     if (!name.trim()) return
     setBusy(true)
-    setMessage('')
+    setToast(null)
     try {
       const key = `volleyball_token_${currentEvent.id}`
       const client_token = localStorage.getItem(key)
@@ -123,10 +145,13 @@ function PublicPage() {
       localStorage.setItem(key, result.client_token)
       localStorage.setItem('volleyball_name', name)
       localStorage.setItem(`volleyball_rsvp_${currentEvent.id}`, JSON.stringify({name, response: status, note}))
-      setMessage('Odgovor je shranjen.')
+      setToast({message: 'Odgovor je uspešno shranjen', type: 'success'})
       await load()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Napaka.')
+      setToast({
+        message: err instanceof Error ? err.message : 'Pri shranjevanju je prišlo do napake.',
+        type: 'error',
+      })
     } finally {
       setBusy(false)
     }
@@ -137,6 +162,7 @@ function PublicPage() {
 
   return (
     <main className="shell">
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <section className="hero">
         <div className="eyebrow">NASLEDNJI TERMIN</div>
         <h1>{slDate(event.date)}</h1>
@@ -182,7 +208,6 @@ function PublicPage() {
           </label>
 
           <button className="primary" disabled={busy}>{busy ? 'Shranjujem…' : 'Shrani odgovor'}</button>
-          {message && <div className="message">{message}</div>}
         </form>
       </section>
 
