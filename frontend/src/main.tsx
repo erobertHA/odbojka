@@ -88,7 +88,7 @@ function Toast({toast, onClose}: {toast: ToastState, onClose: () => void}) {
 
 function PublicPage() {
   const [event, setEvent] = useState<EventItem | null | undefined>(undefined)
-  const [name, setName] = useState(localStorage.getItem('volleyball_name') || '')
+  const [name, setName] = useState('')
   const [status, setStatus] = useState<RSVPStatus>('playing')
   const [note, setNote] = useState('')
   const [toast, setToast] = useState<ToastState>(null)
@@ -106,10 +106,6 @@ function PublicPage() {
     if (!saved) return
     try {
       const mine = JSON.parse(saved)
-      if (mine.name) setName(mine.name)
-      if (mine.response) setStatus(mine.response)
-      setNote(mine.note || '')
-
       const legacyToken = localStorage.getItem(`volleyball_token_${event.id}`)
       if (mine.name && legacyToken) {
         const key = responseTokenKey(event.id, mine.name)
@@ -174,12 +170,14 @@ function PublicPage() {
         body: JSON.stringify({ name, response: status, note, client_token }),
       })
       localStorage.setItem(key, result.client_token)
-      localStorage.setItem('volleyball_name', name)
       localStorage.setItem(savedKey, JSON.stringify({name, response: status, note}))
       setToast({
         message: result.created ? 'Odgovor je uspešno shranjen.' : 'Sprememba je uspešno shranjena.',
         type: 'success',
       })
+      setName('')
+      setStatus('playing')
+      setNote('')
       await load()
     } catch (err) {
       setToast({
