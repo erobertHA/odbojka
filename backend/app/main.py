@@ -176,27 +176,44 @@ def rsvp(event_id: int, body: RSVPBody, db: Session = Depends(db_session)):
     if not event or not event.active:
         raise HTTPException(status_code=404, detail="Termin ne obstaja ali ni več aktiven.")
 
-    client_token = body.client_token or secrets.token_urlsafe(24)
-    existing = db.scalar(
-        select(Response).where(
-            Response.event_id == event_id,
-            Response.client_token == body.name.strip()
+    name = " ".join(body.name.strip().split())
+    if not name:
+        raise HTTPException(status_code=422, detail="Ime je obvezno.")
+
+    own_response = None
+    if body.client_token:
+        own_response = db.scalar(
+            select(Response).where(
+                Response.event_id == event_id,
+                Response.client_token == body.client_token
+            )
         )
+
+    duplicate = next(
+        (
+            response for response in event.responses
+            if response.id != (own_response.id if own_response else None)
+            and " ".join(response.name.strip().split()).casefold() == name.casefold()
+        ),
+        None,
     )
 
-    if existing:
-        existing.response = body.response.value
-        existing.note = (body.note or "").strip() or None
-        existing.client_token = client_token
-        existing.updated_at = datetime.now(timezone.utc)
-        response_obj = existing
+    if duplicate:
+        raise HTTPException(status_code=409, detail="To ime je že prijavljeno.")
+
+    if own_response:
+        own_response.name = name
+        own_response.response = body.response.value
+        own_response.note = (body.note or "").strip() or None
+        own_response.updated_at = datetime.now(timezone.utc)
+        response_obj = own_response
     else:
         response_obj = Response(
             event_id=event_id,
-            name=body.name.strip(),
+            name=name,
             response=body.response.value,
             note=(body.note or "").strip() or None,
-            client_token=client_token,
+            client_token=body.client_token or secrets.token_urlsafe(24),
         )
         db.add(response_obj)
 
