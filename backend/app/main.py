@@ -105,6 +105,12 @@ class RSVPBody(BaseModel):
     note: Optional[str] = Field(default=None, max_length=300)
     client_token: Optional[str] = Field(default=None, max_length=64)
 
+class AdminResponseBody(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    response: RSVPStatus
+    note: Optional[str] = Field(default=None, max_length=300)
+
+
 
 def event_to_dict(event: Event, include_tokens: bool = False):
     responses = sorted(event.responses, key=lambda r: (r.response, r.name.lower()))
@@ -279,6 +285,39 @@ def close_event(event_id: int, db: Session = Depends(db_session)):
         raise HTTPException(status_code=404, detail="Termin ne obstaja.")
     event.active = False
     db.commit()
+    return {"ok": True}
+
+
+@app.put("/admin/responses/{response_id}", dependencies=[Depends(require_admin)])
+def update_response(response_id: int, body: AdminResponseBody, db: Session = Depends(db_session)):
+    response = db.get(Response, response_id)
+    if not response:
+        raise HTTPException(status_code=404, detail="Prijava ne obstaja.")
+
+    name = " ".join(body.name.strip().split())
+    if not name:
+        raise HTTPException(status_code=422, detail="Ime je obvezno.")
+
+    event = db.get(Event, response.event_id)
+    duplicate = next(
+        (
+            item for item in event.responses
+            if item.id != response.id
+            and " ".join(item.name.strip().split()).casefold() == name.casefold()
+        ),
+        None,
+    )
+
+    if duplicate:
+        raise HTTPException(status_code=409, detail="To ime je že prijavljeno.")
+
+    response.name = name
+    response.response = body.response.value
+    response.note = (body.note or "").strip() or None
+    response.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(response)
     return {"ok": True}
 
 

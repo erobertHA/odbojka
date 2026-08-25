@@ -246,6 +246,8 @@ function AdminPage() {
   const [password, setPassword] = useState('')
   const [events, setEvents] = useState<EventItem[]>([])
   const [error, setError] = useState('')
+  const [editing, setEditing] = useState<ResponseItem | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', response: 'playing' as RSVPStatus, note: '' })
   const [form, setForm] = useState({
     date: '',
     start_time: '19:30',
@@ -312,6 +314,33 @@ function AdminPage() {
     await load()
   }
 
+  function startEdit(item: ResponseItem) {
+    setEditing(item)
+    setEditForm({
+      name: item.name,
+      response: item.response,
+      note: item.note || '',
+    })
+    setError('')
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editing) return
+
+    try {
+      await adminApi(`/admin/responses/${editing.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editForm),
+      })
+      setEditing(null)
+      setError('')
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Napaka.')
+    }
+  }
+
   async function deleteResponse(id: number) {
     if (!confirm('Odstranim to prijavo?')) return
     await adminApi(`/admin/responses/${id}`, {method: 'DELETE'})
@@ -368,10 +397,57 @@ function AdminPage() {
             {active.responses.map(r => (
               <div className="admin-response" key={r.id}>
                 <div><strong>{r.name}</strong><span>{labels[r.response]}{r.note ? ` · ${r.note}` : ''}</span></div>
-                <button className="danger" onClick={() => deleteResponse(r.id)}>Izbriši</button>
+                <div className="admin-actions">
+                  <button className="secondary" onClick={() => startEdit(r)}>Uredi</button>
+                  <button className="danger" onClick={() => deleteResponse(r.id)}>Izbriši</button>
+                </div>
               </div>
             ))}
           </div>
+          {editing && (
+            <form className="edit-panel form" onSubmit={saveEdit}>
+              <h3>Uredi prijavo</h3>
+
+              <label>
+                Ime
+                <input
+                  value={editForm.name}
+                  onChange={e => setEditForm({...editForm, name: e.target.value})}
+                  maxLength={80}
+                  required
+                />
+              </label>
+
+              <div className="choices">
+                {(['playing', 'drinks', 'no'] as RSVPStatus[]).map(value => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={`choice ${editForm.response === value ? 'active' : ''}`}
+                    onClick={() => setEditForm({...editForm, response: value})}
+                  >
+                    <span>{value === 'playing' ? '🏐' : value === 'drinks' ? '🍺' : '✕'}</span>
+                    {labels[value]}
+                  </button>
+                ))}
+              </div>
+
+              <label>
+                Opomba <span className="muted">(neobvezno)</span>
+                <input
+                  value={editForm.note}
+                  onChange={e => setEditForm({...editForm, note: e.target.value})}
+                  maxLength={300}
+                />
+              </label>
+
+              <div className="edit-actions">
+                <button className="primary">Shrani spremembe</button>
+                <button type="button" className="secondary" onClick={() => setEditing(null)}>Prekliči</button>
+              </div>
+            </form>
+          )}
+
           <button className="secondary" onClick={() => closeEvent(active.id)}>Zaključi termin</button>
         </section>
       )}

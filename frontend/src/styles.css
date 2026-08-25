@@ -227,3 +227,27 @@ footer a { color: #6b7280; text-decoration: none; }
 .toast.error {
   background: #991b1b;
 }
+
+
+.admin-actions,
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-panel {
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.edit-panel h3 { margin: 0; }
+
+@media (max-width: 600px) {
+  .admin-actions { flex-shrink: 0; }
+  .edit-actions { flex-direction: column; }
+  .edit-actions button { width: 100%; }
+}
