@@ -19,8 +19,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    expose:
-      - "80"
+    ports:
+      - "${WEB_PORT:-8080}:80"
 
 volumes:
   volleyball_data:
