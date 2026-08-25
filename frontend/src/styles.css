@@ -1,0 +1,205 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111827;
+  background: #f3f4f6;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input { font: inherit; }
+
+.shell {
+  width: min(760px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 40px 0 60px;
+}
+.narrow { width: min(520px, calc(100% - 28px)); }
+
+.hero {
+  padding: 18px 4px 24px;
+}
+.hero h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(30px, 6vw, 46px);
+  line-height: 1.05;
+}
+.hero p { color: #6b7280; }
+.eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  color: #6b7280;
+}
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  font-weight: 700;
+  margin-top: 12px;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.04);
+}
+.card h2 { margin: 0 0 16px; font-size: 20px; }
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.score > div:first-child {
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+}
+.score strong { font-size: 34px; }
+.score span { color: #6b7280; }
+.progress-wrap { flex: 1; }
+.progress {
+  width: 100%;
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress div { height: 100%; background: #111827; border-radius: 999px; }
+
+.form { display: flex; flex-direction: column; gap: 16px; }
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-weight: 700;
+}
+input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px 13px;
+  background: white;
+  color: #111827;
+  outline: none;
+}
+input:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17,24,39,.08);
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.choice {
+  border: 1px solid #d1d5db;
+  background: white;
+  padding: 13px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.choice span { display: block; font-size: 20px; margin-bottom: 4px; }
+.choice.active { border: 2px solid #111827; background: #f9fafb; }
+
+.primary, .secondary, .danger {
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+.primary {
+  padding: 13px 18px;
+  background: #111827;
+  color: white;
+}
+.primary:disabled { opacity: .6; }
+.secondary {
+  padding: 10px 14px;
+  background: #e5e7eb;
+  color: #111827;
+}
+.danger {
+  padding: 8px 11px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.message {
+  padding: 10px 12px;
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+.message.error { background: #fee2e2; color: #991b1b; }
+
+.deadline {
+  text-align: center;
+  color: #6b7280;
+  margin: 12px 0 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.section-title h2 { margin: 0; }
+.section-title > span {
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-weight: 800;
+}
+
+.people-list { display: flex; flex-direction: column; }
+.person {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 0;
+  border-top: 1px solid #f3f4f6;
+}
+.person:first-child { border-top: 0; }
+.person span { color: #6b7280; font-size: 14px; }
+
+.muted { color: #6b7280; font-weight: 400; }
+footer { text-align: center; padding: 20px; }
+footer a { color: #6b7280; text-decoration: none; }
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+.grid .wide { grid-column: 1 / -1; }
+
+.admin-responses { margin: 16px 0; }
+.admin-response {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #f3f4f6;
+  gap: 12px;
+}
+.admin-response > div { display: flex; flex-direction: column; gap: 2px; }
+.admin-response span { color: #6b7280; font-size: 14px; }
+
+@media (max-width: 600px) {
+  .shell { padding-top: 22px; }
+  .card { padding: 18px; border-radius: 15px; }
+  .score { align-items: flex-start; }
+  .choices { grid-template-columns: 1fr; }
+  .choice span { display: inline; margin: 0 7px 0 0; }
+  .grid { grid-template-columns: 1fr; }
+  .grid .wide { grid-column: auto; }
+}

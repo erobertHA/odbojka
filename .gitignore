@@ -1,0 +1,26 @@
+# Secrets
+.env
+
+# Database / persistent data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IntelliJ
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
