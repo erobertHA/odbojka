@@ -33,6 +33,14 @@ const labels: Record<RSVPStatus, string> = {
   no: 'Ne pridem',
 }
 
+function normalizedName(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('sl-SI')
+}
+
+function responseTokenKey(eventId: number, name: string) {
+  return `volleyball_token_${eventId}_${encodeURIComponent(normalizedName(name))}`
+}
+
 function slDate(value: string) {
   const d = new Date(`${value}T12:00:00`)
   return new Intl.DateTimeFormat('sl-SI', {
@@ -59,7 +67,7 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
 
 type ToastState = {
   message: string
-  type: 'success' | 'error'
+  type: 'success' | 'error' | 'warning'
 } | null
 
 function Toast({toast, onClose}: {toast: ToastState, onClose: () => void}) {
@@ -101,6 +109,12 @@ function PublicPage() {
       if (mine.name) setName(mine.name)
       if (mine.response) setStatus(mine.response)
       setNote(mine.note || '')
+
+      const legacyToken = localStorage.getItem(`volleyball_token_${event.id}`)
+      if (mine.name && legacyToken) {
+        const key = responseTokenKey(event.id, mine.name)
+        if (!localStorage.getItem(key)) localStorage.setItem(key, legacyToken)
+      }
     } catch {}
   }, [event])
 
@@ -132,20 +146,40 @@ function PublicPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    setBusy(true)
     setToast(null)
+
+    const savedKey = `volleyball_rsvp_${currentEvent.id}`
+    const saved = localStorage.getItem(savedKey)
+    if (saved) {
+      try {
+        const previous = JSON.parse(saved)
+        const unchanged = previous.name === name
+          && previous.response === status
+          && (previous.note || '') === note
+
+        if (unchanged) {
+          setToast({message: 'Ta odgovor je že shranjen.', type: 'warning'})
+          return
+        }
+      } catch {}
+    }
+
+    setBusy(true)
     try {
-      const key = `volleyball_token_${currentEvent.id}`
+      const key = responseTokenKey(currentEvent.id, name)
       const client_token = localStorage.getItem(key)
-      const result = await api<{client_token: string}>(`/events/${currentEvent.id}/rsvp`, {
+      const result = await api<{client_token: string, created: boolean}>(`/events/${currentEvent.id}/rsvp`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ name, response: status, note, client_token }),
       })
       localStorage.setItem(key, result.client_token)
       localStorage.setItem('volleyball_name', name)
-      localStorage.setItem(`volleyball_rsvp_${currentEvent.id}`, JSON.stringify({name, response: status, note}))
-      setToast({message: 'Odgovor je uspešno shranjen', type: 'success'})
+      localStorage.setItem(savedKey, JSON.stringify({name, response: status, note}))
+      setToast({
+        message: result.created ? 'Odgovor je uspešno shranjen.' : 'Sprememba je uspešno shranjena.',
+        type: 'success',
+      })
       await load()
     } catch (err) {
       setToast({
@@ -246,6 +280,7 @@ function AdminPage() {
   const [password, setPassword] = useState('')
   const [events, setEvents] = useState<EventItem[]>([])
   const [error, setError] = useState('')
+  const [toast, setToast] = useState<ToastState>(null)
   const [editing, setEditing] = useState<ResponseItem | null>(null)
   const [editForm, setEditForm] = useState({ name: '', response: 'playing' as RSVPStatus, note: '' })
   const [form, setForm] = useState({
@@ -284,6 +319,11 @@ function AdminPage() {
   async function login(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setToast(null)
+    if (!username.trim() || !password) {
+      setToast({message: 'Vnesi uporabniško ime in geslo.', type: 'error'})
+      return
+    }
     try {
       const result = await api<{token: string}>('/auth/login', {
         method: 'POST',
@@ -293,25 +333,52 @@ function AdminPage() {
       sessionStorage.setItem('admin_token', result.token)
       setToken(result.token)
       setPassword('')
+      setToast({message: 'Prijava je bila uspešna.', type: 'success'})
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Napaka.')
+      const message = e instanceof Error ? e.message : 'Napaka.'
+      setError(message)
+      setToast({message, type: 'error'})
     }
   }
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
+    setToast(null)
+    if (!form.date || !form.start_time || !form.location.trim()) {
+      setToast({message: 'Izpolni datum, začetek in lokacijo.', type: 'error'})
+      return
+    }
+    if (form.minimum_players < 1 || form.minimum_players > 50) {
+      setToast({message: 'Minimum igralcev mora biti med 1 in 50.', type: 'error'})
+      return
+    }
+    if (form.end_time && form.end_time <= form.start_time) {
+      setToast({message: 'Konec termina mora biti po začetku.', type: 'error'})
+      return
+    }
     try {
       await adminApi('/admin/events', {method: 'POST', body: JSON.stringify({...form, signup_deadline: form.signup_deadline || null})})
       setForm({...form, date: '', location: '', description: '', signup_deadline: ''})
+      setError('')
+      setToast({message: 'Termin je uspešno objavljen.', type: 'success'})
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Napaka.')
+      const message = e instanceof Error ? e.message : 'Napaka.'
+      setError(message)
+      setToast({message, type: 'error'})
     }
   }
 
   async function closeEvent(id: number) {
-    await adminApi(`/admin/events/${id}/close`, {method: 'POST'})
-    await load()
+    try {
+      await adminApi(`/admin/events/${id}/close`, {method: 'POST'})
+      setToast({message: 'Termin je uspešno zaključen.', type: 'success'})
+      await load()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Napaka.'
+      setError(message)
+      setToast({message, type: 'error'})
+    }
   }
 
   function startEdit(item: ResponseItem) {
@@ -327,6 +394,21 @@ function AdminPage() {
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editing) return
+    if (!editForm.name.trim()) {
+      setToast({message: 'Ime ne sme biti prazno.', type: 'error'})
+      return
+    }
+
+    const editedName = editForm.name.trim().replace(/\s+/g, ' ')
+    const originalName = editing.name.trim().replace(/\s+/g, ' ')
+    const unchanged = editedName === originalName
+      && editForm.response === editing.response
+      && editForm.note.trim() === (editing.note || '').trim()
+
+    if (unchanged) {
+      setToast({message: 'Ta odgovor je že shranjen.', type: 'warning'})
+      return
+    }
 
     try {
       await adminApi(`/admin/responses/${editing.id}`, {
@@ -335,21 +417,32 @@ function AdminPage() {
       })
       setEditing(null)
       setError('')
+      setToast({message: 'Prijava je uspešno posodobljena.', type: 'success'})
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Napaka.')
+      const message = e instanceof Error ? e.message : 'Napaka.'
+      setError(message)
+      setToast({message, type: 'error'})
     }
   }
 
   async function deleteResponse(id: number) {
     if (!confirm('Odstranim to prijavo?')) return
-    await adminApi(`/admin/responses/${id}`, {method: 'DELETE'})
-    await load()
+    try {
+      await adminApi(`/admin/responses/${id}`, {method: 'DELETE'})
+      setToast({message: 'Prijava je uspešno izbrisana.', type: 'success'})
+      await load()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Napaka.'
+      setError(message)
+      setToast({message, type: 'error'})
+    }
   }
 
   if (!token) {
     return (
       <main className="shell narrow">
+        <Toast toast={toast} onClose={() => setToast(null)} />
         <section className="hero"><div className="eyebrow">ADMIN</div><h1>Prijava</h1></section>
         <section className="card">
           <form onSubmit={login} className="form">
@@ -367,6 +460,7 @@ function AdminPage() {
 
   return (
     <main className="shell">
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <section className="hero admin-header">
         <div><div className="eyebrow">ADMIN</div><h1>Upravljanje terminov</h1></div>
         <button className="secondary" onClick={() => {sessionStorage.removeItem('admin_token'); setToken('')}}>Odjava</button>

@@ -195,7 +195,7 @@ def rsvp(event_id: int, body: RSVPBody, db: Session = Depends(db_session)):
             )
         )
 
-    duplicate = next(
+    matching_name = next(
         (
             response for response in event.responses
             if response.id != (own_response.id if own_response else None)
@@ -204,16 +204,21 @@ def rsvp(event_id: int, body: RSVPBody, db: Session = Depends(db_session)):
         None,
     )
 
-    if duplicate:
+    if own_response and matching_name:
         raise HTTPException(status_code=409, detail="To ime je že prijavljeno.")
 
+    if not own_response and matching_name:
+        own_response = matching_name
+
     if own_response:
+        created = False
         own_response.name = name
         own_response.response = body.response.value
         own_response.note = (body.note or "").strip() or None
         own_response.updated_at = datetime.now(timezone.utc)
         response_obj = own_response
     else:
+        created = True
         response_obj = Response(
             event_id=event_id,
             name=name,
@@ -225,7 +230,7 @@ def rsvp(event_id: int, body: RSVPBody, db: Session = Depends(db_session)):
 
     db.commit()
     db.refresh(response_obj)
-    return {"client_token": response_obj.client_token}
+    return {"client_token": response_obj.client_token, "created": created}
 
 
 @app.get("/admin/events", dependencies=[Depends(require_admin)])

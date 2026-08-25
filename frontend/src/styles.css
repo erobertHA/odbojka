@@ -228,6 +228,10 @@ footer a { color: #6b7280; text-decoration: none; }
   background: #991b1b;
 }
 
+.toast.warning {
+  background: #c2410c;
+}
+
 
 .admin-actions,
 .edit-actions {
