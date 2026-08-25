@@ -145,19 +145,16 @@ function PublicPage() {
     setToast(null)
 
     const savedKey = `volleyball_rsvp_${currentEvent.id}`
-    const saved = localStorage.getItem(savedKey)
-    if (saved) {
-      try {
-        const previous = JSON.parse(saved)
-        const unchanged = previous.name === name
-          && previous.response === status
-          && (previous.note || '') === note
+    const existingResponse = currentEvent.responses.find(
+      response => normalizedName(response.name) === normalizedName(name),
+    )
+    const unchanged = existingResponse
+      && existingResponse.response === status
+      && (existingResponse.note || '').trim() === note.trim()
 
-        if (unchanged) {
-          setToast({message: 'Ta odgovor je že shranjen.', type: 'warning'})
-          return
-        }
-      } catch {}
+    if (unchanged) {
+      setToast({message: 'Ta odgovor je že shranjen.', type: 'warning'})
+      return
     }
 
     setBusy(true)
