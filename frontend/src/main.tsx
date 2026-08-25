@@ -174,17 +174,6 @@ function PublicPage() {
         {event.description && <p>{event.description}</p>}
       </section>
 
-      <section className="score card">
-        <div>
-          <strong>{count}</strong>
-          <span>igralcev</span>
-        </div>
-        <div className="progress-wrap">
-          <div className="progress"><div style={{width: `${Math.min((count / event.minimum_players) * 100, 100)}%`}} /></div>
-          <small>{missing ? `Manjka še ${missing} do minimuma ${event.minimum_players}.` : `Dovolj igralcev za termin.`}</small>
-        </div>
-      </section>
-
       <section className="card">
         <h2>Tvoj odgovor</h2>
         <form onSubmit={submit} className="form">
@@ -209,6 +198,17 @@ function PublicPage() {
 
           <button className="primary" disabled={busy}>{busy ? 'Shranjujem…' : 'Shrani odgovor'}</button>
         </form>
+      </section>
+
+      <section className="score card">
+        <div>
+          <strong>{count}</strong>
+          <span>igralcev</span>
+        </div>
+        <div className="progress-wrap">
+          <div className="progress"><div style={{width: `${Math.min((count / event.minimum_players) * 100, 100)}%`}} /></div>
+          <small>{missing ? `Manjka še ${missing} do minimuma ${event.minimum_players}.` : `Trenutno število igralcev: ${count}`}</small>
+        </div>
       </section>
 
       {event.signup_deadline && <div className="deadline">Prijave do: {event.signup_deadline.replace('T', ' ')}</div>}
