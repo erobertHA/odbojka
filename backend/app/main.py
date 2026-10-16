@@ -4,8 +4,9 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response as HTTPResponse, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -17,6 +18,7 @@ ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "change-me-now")
 SECRET_KEY = os.getenv("SECRET_KEY", "please-change-this-to-a-long-random-secret")
 ALGORITHM = "HS256"
+SITE_PASSWORD = "RobiJeCar"
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
@@ -68,6 +70,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 security = HTTPBearer(auto_error=False)
+
+
+@app.middleware("http")
+async def site_access(request: Request, call_next):
+    if request.url.path not in {"/health", "/auth/unlock"}:
+        try:
+            payload = jwt.decode(request.cookies.get("site_access", ""), SECRET_KEY, algorithms=[ALGORITHM])
+            if payload.get("scope") != "site_access":
+                raise JWTError()
+        except JWTError:
+            return JSONResponse(status_code=401, content={"detail": "Za dostop vpiši geslo.", "locked": True})
+    return await call_next(request)
+
+
+class UnlockBody(BaseModel):
+    password: str = Field(max_length=256)
+
+
+@app.post("/auth/unlock")
+def unlock(body: UnlockBody, request: Request, response: HTTPResponse):
+    if not secrets.compare_digest(body.password.encode(), SITE_PASSWORD.encode()):
+        raise HTTPException(status_code=401, detail="Napačno geslo.")
+    token = jwt.encode({"scope": "site_access", "exp": datetime.now(timezone.utc) + timedelta(hours=12)},
+                       SECRET_KEY, algorithm=ALGORITHM)
+    response.set_cookie("site_access", token, httponly=True, samesite="strict",
+                        secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https",
+                        max_age=12 * 60 * 60, path="/")
+    return {"ok": True}
+
+
+@app.get("/auth/access")
+def access():
+    return {"ok": True}
 
 
 def db_session():

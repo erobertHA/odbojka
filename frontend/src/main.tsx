@@ -57,7 +57,8 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
     let detail = 'Prišlo je do napake.'
     try {
       const body = await res.json()
-      detail = body.detail || detail
+      if (body.locked) window.dispatchEvent(new Event('site-locked'))
+      detail = typeof body.detail === 'string' ? body.detail : detail
     } catch {}
     throw new Error(detail)
   }
@@ -560,6 +561,43 @@ function AdminPage() {
 }
 
 function App() {
+  const [unlocked, setUnlocked] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const lock = () => setUnlocked(false)
+    window.addEventListener('site-locked', lock)
+    api('/auth/access').then(() => setUnlocked(true)).catch(() => {}).finally(() => setChecking(false))
+    return () => window.removeEventListener('site-locked', lock)
+  }, [])
+
+  async function unlock(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await api('/auth/unlock', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password}),
+      })
+      setPassword('')
+      setUnlocked(true)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Napaka.') }
+    finally { setBusy(false) }
+  }
+
+  if (checking) return <main className="shell narrow"><div className="card">Nalagam…</div></main>
+  if (!unlocked) return <main className="shell narrow">
+    <section className="hero"><div className="eyebrow">ODBOJKA</div><h1>Vstop na stran</h1><p>Za dostop vpiši geslo.</p></section>
+    <section className="card"><form className="form" onSubmit={unlock}>
+      <label>Geslo<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} maxLength={256} required autoFocus /></label>
+      <button className="primary" disabled={busy}>{busy ? 'Preverjam…' : 'Vstopi'}</button>
+      {error && <div className="message error" role="alert">{error}</div>}
+    </form></section>
+  </main>
   return window.location.pathname.startsWith('/admin') ? <AdminPage /> : <PublicPage />
 }
 

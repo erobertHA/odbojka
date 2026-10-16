@@ -4,6 +4,7 @@ Preprosta aplikacija za prijavo na naslednji termin odbojke.
 
 ## Funkcije
 
+- dostop do strani s skupnim geslom `RobiJeCar` (velja 12 ur)
 - prikaz naslednjega termina
 - lokacija, ura, minimum igralcev in rok prijave
 - RSVP brez prijave:
