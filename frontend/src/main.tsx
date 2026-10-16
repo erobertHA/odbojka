@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
+import { PrivacyFooter } from './PrivacyFooter'
 
 type RSVPStatus = 'playing' | 'drinks' | 'no'
 
@@ -602,5 +603,5 @@ function App() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode><App /><PrivacyFooter /></React.StrictMode>
 )
