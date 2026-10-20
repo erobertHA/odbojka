@@ -106,3 +106,23 @@ npm run dev
 ```
 
 V Vite development načinu se `/api` proxya na `http://localhost:8000`.
+
+
+## Ankete
+
+Po odklepu se aktivne ankete prikažejo v vijolični kartici nad naslednjim terminom, tudi če termina ni. Če aktivnih anket ni, kartice ni. Aktivnih je lahko več anket hkrati.
+
+Na `/admin` je razdelek **Ankete**. Administrator določi naslov, od 1 do 20 vprašanj in od 2 do 20 odgovorov na vprašanje. Po objavi so vprašanja nespremenljiva; za drugačna vprašanja objavi novo anketo. Arhiviranje skrije anketo in njene rezultate uporabnikom ter ustavi glasovanje. Administrator v arhivu vidi vprašanja, datum objave/arhiviranja ter imena, odgovore in čas oddaje.
+
+Uporabnik vpiše ime in izbere en odgovor pri vsakem vprašanju. Normalizirano ime lahko na isto anketo odgovori enkrat. Rezultati so skupni in ne vsebujejo imen; API jih vrne šele z naključnim žetonom, izdanim ob oddaji. Žeton je shranjen v `sessionStorage`, zato so rezultati dostopni tudi po osvežitvi istega zavihka. Brez uporabniških računov ime ostaja samoprijavljeno; anketa ne preverja identitete in ne preprečuje glasovanja pod drugim imenom.
+
+Ob zagonu se samodejno ustvarita novi tabeli `polls` in `poll_submissions`. Obstoječih tabel in podatkov se ne spreminja. Arhiviranje anket podatkov ne izbriše. Odgovori niso vezani na rok hrambe prijav na odbojko; rok hrambe arhiva anket mora določiti organizator.
+
+Preverjanje na začasni bazi (potrebne so backend odvisnosti in `httpx`):
+
+```sh
+python -m unittest discover -s tests -p 'test_*.py'
+npm --prefix frontend run build
+```
+
+Za preizkus uporabniškega vmesnika je dodan `tests/polls_browser.py` (potrebuje še Python `playwright`, Google Chrome in dovoljenje za lokalni testni strežnik). Preverja namizni in mobilni prikaz, več vprašanj, rezultate po oddaji, imena v administratorskem pregledu in arhiviranje. Med implementacijo njegov zagon ni bil dovoljen; preverjanje v brskalniku zato ostaja za izvedbo.

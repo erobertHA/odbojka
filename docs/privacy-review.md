@@ -74,3 +74,16 @@ Brskalniški test zahteva nameščen Google Chrome in dovoljen lokalni testni st
 - Prvi brskalniški test: modal se odpre, začetni fokus in prehod na besedilo delujeta; pri kroženju Tab je test zaznal prehod fokusa iz modala v vrstico brskalnika. Dodano je izrecno kroženje fokusa naprej/nazaj. Build po popravku je uspešen.
 - Ponovni brskalniški test je bil zavrnjen pri zahtevi za dovoljenje lokalnega strežnika in brskalnika. Zato celoten namizni in mobilni test, ESC, povratek fokusa, pomikanje in RSVP prek brskalnika ostajajo za ponovitev. Teh preverjanj ne štejemo kot uspešno opravljenih.
 - `git diff --check`: uspešno. Sprememb backend kode, sheme in produkcijskih podatkov ni.
+
+
+## Dopolnitev: ankete (20. 10. 2026)
+
+Nova funkcija dodaja tabeli `polls` (naslov, vprašanja in ponujeni odgovori, datum nastanka/arhiviranja, aktivnost) ter `poll_submissions` (ime, normalizirano ime za preprečevanje ponovitev, izbrane možnosti, čas oddaje, naključni žeton). Datumi posameznih vprašanj so enaki datumu objave njihove ankete; po objavi jih ni mogoče spreminjati. Obstoječe tabele ostanejo nespremenjene.
+
+Ankete podedujejo zaščito z dostopnim piškotkom. Administratorske poti zahtevajo tudi admin žeton. Uporabniške poti pred oddajo vrnejo samo aktivna vprašanja in možnosti. Rezultati zahtevajo naključni žeton, izdan ob uspešni oddaji, in vsebujejo samo skupna števila, brez imen. Žeton se prenaša v glavi `X-Poll-Token`, ne v URL. Shrani se v `sessionStorage` pod ključem `volleyball_poll_<id>` do zaprtja zavihka; tam se ime in izbire ne shranjujejo. Administrator vidi posamezne odgovore z imeni in datumi tudi v arhivu.
+
+Enkratno glasovanje je omejeno po normaliziranem samoprijavljenem imenu. To ni preverjanje identitete; uporabnik lahko uporabi drugo ime, nekdo pa lahko prvi uporabi ime drugega člana. Sistem ne omogoča prevzema ali spreminjanja že oddanega odgovora z vnosom istega imena. Arhiviranje ni izbris; rok hrambe odgovorov na ankete še ni določen in ni samodejno rok za prijave na termin. Obvestilo o zasebnosti je dopolnjeno s temi dejstvi.
+
+Dodani so API testi glasovanja, zavrnitve nepopolnih/neveljavnih odgovorov, podvojenih imen, dovoljenj, rezultatov, arhiva in nadgradnje obstoječe SQLite sheme brez spremembe shranjenih terminov/prijav. Test `tests/polls_browser.py` je pripravljen, zagon lokalnega strežnika/Chroma pa ni bil dovoljen. Produkcijska baza ni bila uporabljena.
+
+Rezultat preverjanja anket: vseh 9 API/regresijskih testov je uspešnih, vključno s testom ohranitve podatkov pri dodajanju novih tabel; TypeScript/Vite build je uspešen. Brskalniški test ni bil izveden.

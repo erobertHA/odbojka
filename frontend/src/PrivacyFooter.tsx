@@ -44,6 +44,7 @@ export function PrivacyFooter() {
           <li>Ime oziroma vzdevek udeleženca.</li>
           <li>Status udeležbe na posameznem terminu.</li>
           <li>Morebitno prostovoljno vneseno opombo.</li>
+          <li>Ime, izbrane odgovore in čas oddaje pri anketah.</li>
           <li>Tehnične identifikatorje prijave in termina, žeton za urejanje odgovora ter čas nastanka in zadnje spremembe prijave.</li>
         </ul>
         <p>V opombo vnesi samo podatke, ki jih želiš deliti s skupino.</p>
@@ -51,15 +52,18 @@ export function PrivacyFooter() {
         <p>Podatke uporabljamo za organizacijo odbojkarskih srečanj, prikaz prijavljenih udeležencev in urejanje odgovorov.</p>
         <h3>Kdo lahko vidi podatke?</h3>
         <p>Prijave na trenutni termin lahko vidijo osebe z dostopnim geslom. Organizator z administratorskim dostopom lahko vidi tudi arhiv, ureja in briše prijave. Geslo je namenjeno samo članom zasebne skupine in ga ne deli naprej.</p>
+        <p>Pri anketah lahko po oddaji vidiš skupne rezultate brez imen. Organizator vidi imena in posamezne odgovore tudi v arhivu anket.</p>
         <h3>Kako dolgo hranimo podatke?</h3>
         <p>{config.retentionPolicy || 'Rok hrambe še ni potrjen. Aplikacija trenutno hrani tudi pretekle termine in njihove prijave ter jih ne briše samodejno. Administrator mora pred uvedbo tega obvestila potrditi rok in način brisanja, tudi za varnostne kopije.'}</p>
         <p>Aplikacija prijav ob objavi naslednjega termina trenutno ne izbriše samodejno, ampak jih ohrani v arhivu. Za izbris v dogovorjenem roku mora poskrbeti organizator. Rok izbrisa iz varnostnih kopij mora administrator še potrditi.</p>
+        <p>Odgovori na ankete ostanejo v administratorskem arhivu tudi po arhiviranju ankete. Rok njihovega izbrisa mora organizator še določiti.</p>
         <h3>Popravek ali izbris podatkov</h3>
         <p>Za popravek ali izbris podatkov se obrni na organizatorja srečanj.</p>
         <p>{config.organizerContact ? `Kontakt organizatorja: ${config.organizerContact}` : 'Kontakt organizatorja: čaka na potrditev administratorja.'}</p>
         <h3>Piškotki in shranjevanje v brskalniku</h3>
         <p>Za dostop uporabljamo nujni piškotek <code>site_access</code>, ki velja 12 ur. Vsebuje podpisan dostopni žeton, ne gesla, in ni dostopen JavaScriptu.</p>
         <p>V <code>localStorage</code> shranimo ime, status, opombo in žeton za ponovno urejanje odgovora za posamezni termin. Ti podatki nimajo samodejnega roka izteka in ostanejo do brisanja podatkov spletnega mesta v brskalniku. Brisanje v brskalniku ne izbriše prijave na strežniku.</p>
+        <p>Za ponovni prikaz rezultatov oddane ankete shranimo njen dostopni žeton v <code>sessionStorage</code>, do zaprtja zavihka. Imena in odgovorov ankete tam ne shranjujemo.</p>
         <p>Pri administratorski prijavi shranimo dostopni žeton v <code>sessionStorage</code>, praviloma do zaprtja zavihka oziroma odjave; žeton velja največ 12 ur.</p>
         <p>Aplikacija ne vključuje zunanje analitike, oglaševalskih piškotkov ali sledilnikov.</p>
         <h3>Tehnični dnevniki</h3>

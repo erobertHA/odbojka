@@ -35,7 +35,7 @@ class AccessTests(unittest.TestCase):
             if route.path in {"/health", "/auth/unlock"}:
                 continue
             for method in route.methods or []:
-                path = route.path.replace("{event_id}", "1").replace("{response_id}", "1")
+                path = route.path.replace("{event_id}", "1").replace("{response_id}", "1").replace("{poll_id}", "1")
                 with self.subTest(method=method, path=path):
                     result = self.client.request(method, path)
                     self.assertEqual(result.status_code, 401)
@@ -84,8 +84,8 @@ class AccessTests(unittest.TestCase):
         self.assertEqual(self.client.post(f"/admin/events/{event_id}/close", headers=headers).status_code, 200)
         self.assertIsNone(self.client.get("/events/current").json())
 
-    def test_schema_contains_only_existing_tables(self):
-        self.assertEqual(set(inspect(engine).get_table_names()), {"events", "responses"})
+    def test_schema_preserves_existing_tables(self):
+        self.assertEqual(set(inspect(engine).get_table_names()), {"events", "responses", "polls", "poll_submissions"})
         self.assertEqual({c["name"] for c in inspect(engine).get_columns("responses")}, {"id", "event_id", "name", "response", "note", "client_token", "created_at", "updated_at"})
 
 

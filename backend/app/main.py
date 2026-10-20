@@ -4,13 +4,14 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response as HTTPResponse, status
+from fastapi import Depends, FastAPI, HTTPException, Header, Request, Response as HTTPResponse, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel, Field
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, select
+from pydantic import BaseModel, Field, StrictInt
+from sqlalchemy import JSON, UniqueConstraint, Boolean, DateTime, ForeignKey, Integer, String, Text, create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./volleyball.db")
@@ -57,6 +58,32 @@ class Response(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     event: Mapped[Event] = relationship(back_populates="responses")
+
+
+class Poll(Base):
+    __tablename__ = "polls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200))
+    questions: Mapped[list] = mapped_column(JSON)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    submissions: Mapped[list["PollSubmission"]] = relationship(back_populates="poll", cascade="all, delete-orphan")
+
+
+class PollSubmission(Base):
+    __tablename__ = "poll_submissions"
+    __table_args__ = (UniqueConstraint("poll_id", "name_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    poll_id: Mapped[int] = mapped_column(ForeignKey("polls.id"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    name_key: Mapped[str] = mapped_column(String(160))
+    answers: Mapped[list] = mapped_column(JSON)
+    token: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    poll: Mapped[Poll] = relationship(back_populates="submissions")
 
 
 Base.metadata.create_all(bind=engine)
@@ -368,4 +395,121 @@ def delete_response(response_id: int, db: Session = Depends(db_session)):
         raise HTTPException(status_code=404, detail="Prijava ne obstaja.")
     db.delete(response)
     db.commit()
+    return {"ok": True}
+
+
+# Poll questions are immutable after publication, so historical answers keep their meaning.
+class PollQuestionBody(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+    options: list[str] = Field(min_length=2, max_length=20)
+
+
+class PollBody(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    questions: list[PollQuestionBody] = Field(min_length=1, max_length=20)
+
+
+class PollVoteBody(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    answers: list[StrictInt] = Field(min_length=1, max_length=20)
+
+
+def poll_dict(poll: Poll):
+    def utc(value):
+        return value.replace(tzinfo=timezone.utc).isoformat() if value else None
+    return {"id": poll.id, "title": poll.title, "questions": poll.questions,
+            "active": poll.active, "created_at": utc(poll.created_at), "archived_at": utc(poll.archived_at)}
+
+
+def poll_results(poll: Poll):
+    return {**poll_dict(poll), "total": len(poll.submissions), "counts": [
+        [sum(vote.answers[qi] == oi for vote in poll.submissions) for oi in range(len(question["options"]))]
+        for qi, question in enumerate(poll.questions)
+    ]}
+
+
+@app.get("/polls/active")
+def active_polls(db: Session = Depends(db_session)):
+    return [poll_dict(poll) for poll in db.scalars(select(Poll).where(Poll.active == True).order_by(Poll.created_at.desc(), Poll.id.desc())).all()]
+
+
+@app.post("/polls/{poll_id}/vote", status_code=201)
+def vote_poll(poll_id: int, body: PollVoteBody, db: Session = Depends(db_session)):
+    # Serialize vote/archive writes on SQLite to avoid accepting a vote after archival.
+    if engine.dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    poll = db.get(Poll, poll_id)
+    if not poll or not poll.active:
+        raise HTTPException(status_code=404, detail="Anketa ni več aktivna.")
+    name = " ".join(body.name.split())
+    if not name:
+        raise HTTPException(status_code=422, detail="Vpiši svoje ime.")
+    if len(body.answers) != len(poll.questions) or any(
+        type(answer) is not int or answer < 0 or answer >= len(poll.questions[i]["options"])
+        for i, answer in enumerate(body.answers)
+    ):
+        raise HTTPException(status_code=422, detail="Izberi en odgovor za vsako vprašanje.")
+    vote = PollSubmission(poll_id=poll.id, name=name, name_key=name.casefold(),
+                          answers=body.answers, token=secrets.token_urlsafe(32))
+    db.add(vote)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="To ime je na to anketo že odgovorilo.")
+    return {"token": vote.token, "results": poll_results(poll)}
+
+
+@app.get("/polls/{poll_id}/results")
+def get_poll_results(poll_id: int, x_poll_token: str = Header(default="", max_length=64), db: Session = Depends(db_session)):
+    poll = db.get(Poll, poll_id)
+    if not poll or not poll.active:
+        raise HTTPException(status_code=404, detail="Anketa ni več aktivna.")
+    vote = db.scalar(select(PollSubmission).where(PollSubmission.poll_id == poll_id, PollSubmission.token == x_poll_token))
+    if not vote:
+        raise HTTPException(status_code=403, detail="Rezultati so na voljo po oddaji odgovora.")
+    return poll_results(poll)
+
+
+@app.get("/admin/polls", dependencies=[Depends(require_admin)])
+def admin_polls(db: Session = Depends(db_session)):
+    polls = db.scalars(select(Poll).order_by(Poll.created_at.desc(), Poll.id.desc())).all()
+    return [{**poll_results(poll), "submissions": [
+        {"id": vote.id, "name": vote.name, "answers": vote.answers,
+         "created_at": vote.created_at.replace(tzinfo=timezone.utc).isoformat()}
+        for vote in sorted(poll.submissions, key=lambda vote: vote.created_at)
+    ]} for poll in polls]
+
+
+@app.post("/admin/polls", dependencies=[Depends(require_admin)], status_code=201)
+def create_poll(body: PollBody, db: Session = Depends(db_session)):
+    title = body.title.strip()
+    questions = []
+    for question in body.questions:
+        text = question.text.strip()
+        options = [option.strip() for option in question.options]
+        if not text or any(not option or len(option) > 200 for option in options):
+            raise HTTPException(status_code=422, detail="Izpolni vprašanja in vse odgovore (največ 200 znakov na odgovor).")
+        if len({option.casefold() for option in options}) != len(options):
+            raise HTTPException(status_code=422, detail="Odgovori pri istem vprašanju morajo biti različni.")
+        questions.append({"text": text, "options": options})
+    if not title:
+        raise HTTPException(status_code=422, detail="Vnesi naslov ankete.")
+    poll = Poll(title=title, questions=questions)
+    db.add(poll)
+    db.commit()
+    return poll_dict(poll)
+
+
+@app.post("/admin/polls/{poll_id}/archive", dependencies=[Depends(require_admin)])
+def archive_poll(poll_id: int, db: Session = Depends(db_session)):
+    if engine.dialect.name == "sqlite":
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    poll = db.get(Poll, poll_id)
+    if not poll:
+        raise HTTPException(status_code=404, detail="Anketa ne obstaja.")
+    if poll.active:
+        poll.active = False
+        poll.archived_at = datetime.now(timezone.utc)
+        db.commit()
     return {"ok": True}

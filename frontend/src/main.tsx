@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { PrivacyFooter } from './PrivacyFooter'
+import { api } from './api'
+import { AdminPolls, PublicPolls } from './Polls'
 
 type RSVPStatus = 'playing' | 'drinks' | 'no'
 
@@ -26,8 +28,6 @@ type EventItem = {
   responses: ResponseItem[]
 }
 
-const API = '/api'
-
 const labels: Record<RSVPStatus, string> = {
   playing: 'Igram',
   drinks: 'Samo na pijačo',
@@ -51,21 +51,6 @@ function slDate(value: string) {
     year: 'numeric',
   }).format(d)
 }
-
-async function api<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${url}`, options)
-  if (!res.ok) {
-    let detail = 'Prišlo je do napake.'
-    try {
-      const body = await res.json()
-      if (body.locked) window.dispatchEvent(new Event('site-locked'))
-      detail = typeof body.detail === 'string' ? body.detail : detail
-    } catch {}
-    throw new Error(detail)
-  }
-  return res.json()
-}
-
 
 type ToastState = {
   message: string
@@ -311,6 +296,20 @@ function AdminPage() {
     }
   }
 
+  useEffect(() => {
+    function sessionExpired(event: Event) {
+      if ((event as CustomEvent<string>).detail !== `Bearer ${token}`) return
+      sessionStorage.removeItem('admin_token')
+      setToken('')
+      setEvents([])
+      setEditing(null)
+      setToast(null)
+      setError('Administratorska seja je potekla ali ni več veljavna. Prijavi se znova.')
+    }
+    window.addEventListener('admin-unauthorized', sessionExpired)
+    return () => window.removeEventListener('admin-unauthorized', sessionExpired)
+  }, [token])
+
   useEffect(() => { load() }, [token])
 
   async function login(e: React.FormEvent) {
@@ -465,6 +464,8 @@ function AdminPage() {
 
       {error && <div className="message error">{error}</div>}
 
+      <AdminPolls token={token} />
+
       <section className="card">
         <h2>Nov termin</h2>
         <p className="muted">Objava novega termina samodejno zapre trenutno aktivnega.</p>
@@ -599,7 +600,7 @@ function App() {
       {error && <div className="message error" role="alert">{error}</div>}
     </form></section>
   </main>
-  return window.location.pathname.startsWith('/admin') ? <AdminPage /> : <PublicPage />
+  return window.location.pathname.startsWith('/admin') ? <AdminPage /> : <><PublicPolls /><PublicPage /></>
 }
 
 createRoot(document.getElementById('root')!).render(
