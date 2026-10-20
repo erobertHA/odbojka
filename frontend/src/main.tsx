@@ -179,19 +179,30 @@ function PublicPage() {
   return (
     <main className="shell">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <section className="hero">
+      <section className="hero event-hero">
         <div className="eyebrow">NASLEDNJI TERMIN</div>
         <h1>{slDate(event.date)}</h1>
         <div className="event-meta">
           <span>{event.start_time}{event.end_time ? `–${event.end_time}` : ''}</span>
-          <span>•</span>
           <span>{event.location}</span>
         </div>
         {event.description && <p>{event.description}</p>}
       </section>
 
+      <section className="score card">
+        <div>
+          <strong>{count}</strong>
+          <span>igralcev</span>
+        </div>
+        <div className="progress-wrap">
+          <div className="progress" role="progressbar" aria-label="Igralci do minimuma" aria-valuemin={0} aria-valuemax={event.minimum_players} aria-valuenow={Math.min(count, event.minimum_players)} aria-valuetext={`${count} igralcev, minimum ${event.minimum_players}`}><div style={{width: `${Math.min((count / event.minimum_players) * 100, 100)}%`}} /></div>
+          <small>{missing ? `Manjka še ${missing} do minimuma ${event.minimum_players}.` : `Trenutno število igralcev: ${count}`}</small>
+        </div>
+      </section>
+
       <section className="card">
         <h2>Tvoj odgovor</h2>
+        <p className="form-description">Se vidimo na igrišču? Vpiši ime in izberi, kako se nam pridružiš.</p>
         <form onSubmit={submit} className="form">
           <label>
             Ime
@@ -200,7 +211,7 @@ function PublicPage() {
 
           <div className="choices">
             {(['playing', 'drinks', 'no'] as RSVPStatus[]).map(value => (
-              <button type="button" key={value} className={`choice ${status === value ? 'active' : ''}`} onClick={() => setStatus(value)}>
+              <button type="button" key={value} className={`choice ${status === value ? 'active' : ''}`} aria-pressed={status === value} onClick={() => setStatus(value)}>
                 <span>{value === 'playing' ? '🏐' : value === 'drinks' ? '🍺' : '✕'}</span>
                 {labels[value]}
               </button>
@@ -214,17 +225,6 @@ function PublicPage() {
 
           <button className="primary" disabled={busy}>{busy ? 'Shranjujem…' : 'Shrani odgovor'}</button>
         </form>
-      </section>
-
-      <section className="score card">
-        <div>
-          <strong>{count}</strong>
-          <span>igralcev</span>
-        </div>
-        <div className="progress-wrap">
-          <div className="progress"><div style={{width: `${Math.min((count / event.minimum_players) * 100, 100)}%`}} /></div>
-          <small>{missing ? `Manjka še ${missing} do minimuma ${event.minimum_players}.` : `Trenutno število igralcev: ${count}`}</small>
-        </div>
       </section>
 
       {event.signup_deadline && <div className="deadline">Prijave do: {event.signup_deadline.replace('T', ' ')}</div>}
@@ -516,6 +516,7 @@ function AdminPage() {
                     type="button"
                     key={value}
                     className={`choice ${editForm.response === value ? 'active' : ''}`}
+                    aria-pressed={editForm.response === value}
                     onClick={() => setEditForm({...editForm, response: value})}
                   >
                     <span>{value === 'playing' ? '🏐' : value === 'drinks' ? '🍺' : '✕'}</span>
