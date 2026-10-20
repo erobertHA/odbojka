@@ -402,6 +402,7 @@ def delete_response(response_id: int, db: Session = Depends(db_session)):
 class PollQuestionBody(BaseModel):
     text: str = Field(min_length=1, max_length=500)
     options: list[str] = Field(min_length=2, max_length=20)
+    multiple: bool = False
 
 
 class PollBody(BaseModel):
@@ -411,7 +412,7 @@ class PollBody(BaseModel):
 
 class PollVoteBody(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    answers: list[StrictInt] = Field(min_length=1, max_length=20)
+    answers: list[StrictInt | list[StrictInt]] = Field(min_length=1, max_length=20)
 
 
 def poll_dict(poll: Poll):
@@ -423,7 +424,7 @@ def poll_dict(poll: Poll):
 
 def poll_results(poll: Poll):
     return {**poll_dict(poll), "total": len(poll.submissions), "counts": [
-        [sum(vote.answers[qi] == oi for vote in poll.submissions) for oi in range(len(question["options"]))]
+        [sum(oi in (vote.answers[qi] if isinstance(vote.answers[qi], list) else [vote.answers[qi]]) for vote in poll.submissions) for oi in range(len(question["options"]))]
         for qi, question in enumerate(poll.questions)
     ]}
 
@@ -444,13 +445,19 @@ def vote_poll(poll_id: int, body: PollVoteBody, db: Session = Depends(db_session
     name = " ".join(body.name.split())
     if not name:
         raise HTTPException(status_code=422, detail="Vpiši svoje ime.")
-    if len(body.answers) != len(poll.questions) or any(
-        type(answer) is not int or answer < 0 or answer >= len(poll.questions[i]["options"])
-        for i, answer in enumerate(body.answers)
-    ):
-        raise HTTPException(status_code=422, detail="Izberi en odgovor za vsako vprašanje.")
+    if len(body.answers) != len(poll.questions):
+        raise HTTPException(status_code=422, detail="Odgovori na vsako vprašanje.")
+    answers = []
+    for question, answer in zip(poll.questions, body.answers):
+        choices = answer if isinstance(answer, list) else [answer]
+        if (not choices or len(choices) > len(question["options"])
+                or len(set(choices)) != len(choices)
+                or any(choice < 0 or choice >= len(question["options"]) for choice in choices)
+                or (not question.get("multiple", False) and len(choices) != 1)):
+            raise HTTPException(status_code=422, detail="Pri vsakem vprašanju izberi dovoljeno število različnih odgovorov.")
+        answers.append(sorted(choices) if question.get("multiple", False) else choices[0])
     vote = PollSubmission(poll_id=poll.id, name=name, name_key=name.casefold(),
-                          answers=body.answers, token=secrets.token_urlsafe(32))
+                          answers=answers, token=secrets.token_urlsafe(32))
     db.add(vote)
     try:
         db.commit()
@@ -492,7 +499,7 @@ def create_poll(body: PollBody, db: Session = Depends(db_session)):
             raise HTTPException(status_code=422, detail="Izpolni vprašanja in vse odgovore (največ 200 znakov na odgovor).")
         if len({option.casefold() for option in options}) != len(options):
             raise HTTPException(status_code=422, detail="Odgovori pri istem vprašanju morajo biti različni.")
-        questions.append({"text": text, "options": options})
+        questions.append({"text": text, "options": options, "multiple": question.multiple})
     if not title:
         raise HTTPException(status_code=422, detail="Vnesi naslov ankete.")
     poll = Poll(title=title, questions=questions)

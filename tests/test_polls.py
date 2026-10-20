@@ -95,5 +95,44 @@ class PollTests(unittest.TestCase):
             legacy.dispose()
 
 
+    def test_multiple_answers_and_mixed_question_results(self):
+        self.body['questions'][0]['multiple'] = True
+        poll_id = self.create()
+        first = self.client.post(f'/polls/{poll_id}/vote', json={'name': 'Ana', 'answers': [[2, 0], 1]})
+        self.assertEqual(first.status_code, 201, first.text)
+        self.assertEqual(first.json()['results']['counts'], [[1, 0, 1], [0, 1]])
+        second = self.client.post(f'/polls/{poll_id}/vote', json={'name': 'Bojan', 'answers': [[0, 1], [0]]})
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.json()['results']['counts'], [[2, 1, 1], [1, 1]])
+        self.assertEqual(second.json()['results']['total'], 2)
+        report = next(p for p in self.client.get('/admin/polls', headers=self.admin).json() if p['id'] == poll_id)
+        self.assertTrue(report['questions'][0]['multiple'])
+        self.assertFalse(report['questions'][1]['multiple'])
+        self.assertEqual(report['submissions'][0]['answers'], [[0, 2], 1])
+        self.client.post(f'/admin/polls/{poll_id}/archive', headers=self.admin)
+        archive = next(p for p in self.client.get('/admin/polls', headers=self.admin).json() if p['id'] == poll_id)
+        self.assertEqual(archive['counts'], [[2, 1, 1], [1, 1]])
+
+    def test_multiple_choice_validation_and_legacy_data(self):
+        self.body['questions'][0]['multiple'] = True
+        poll_id = self.create()
+        for answers in [[[], 0], [[0, 0], 0], [[-1], 0], [[3], 0], [[True], 0], [['1'], 0], [[0], [0, 1]], [[0], []]]:
+            with self.subTest(answers=answers):
+                self.assertEqual(self.client.post(f'/polls/{poll_id}/vote', json={'name': 'Test', 'answers': answers}).status_code, 422)
+        # Old JSON questions omit the new flag; old stored answers are integers.
+        from app.main import Poll, PollSubmission, SessionLocal
+        with SessionLocal() as db:
+            legacy = Poll(title='Obstoječa anketa', questions=[{'text': 'Dan?', 'options': ['Torek', 'Petek']}])
+            db.add(legacy)
+            db.flush()
+            legacy_id = legacy.id
+            db.add(PollSubmission(poll_id=legacy_id, name='Ana', name_key='ana', answers=[1], token='legacy-result-token'))
+            db.commit()
+        self.assertEqual(self.client.post(f'/polls/{legacy_id}/vote', json={'name': 'Bojan', 'answers': [[0, 1]]}).status_code, 422)
+        vote = self.client.post(f'/polls/{legacy_id}/vote', json={'name': 'Bojan', 'answers': [0]})
+        self.assertEqual(vote.status_code, 201)
+        self.assertEqual(vote.json()['results']['counts'], [[1, 1]])
+
+
 if __name__ == '__main__':
     unittest.main()

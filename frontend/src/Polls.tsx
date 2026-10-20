@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from './api'
 
-type Question = { text: string; options: string[] }
+type Question = { text: string; options: string[]; multiple?: boolean }
 type Poll = { id: number; title: string; questions: Question[]; active: boolean; created_at: string; archived_at: string | null }
 type Results = Poll & { total: number; counts: number[][] }
-type AdminPoll = Results & { submissions: { id: number; name: string; answers: number[]; created_at: string }[] }
+type AdminPoll = Results & { submissions: { id: number; name: string; answers: (number | number[])[]; created_at: string }[] }
 
 const tokenKey = (id: number) => `volleyball_poll_${id}`
 function savedToken(id: number) {
@@ -20,11 +20,12 @@ function PollResults({results}: {results: Results}) {
     <p><strong>Rezultati</strong> · Oddanih odgovorov: {results.total}</p>
     {results.questions.map((question, qi) => <div key={qi}>
       <h3>{question.text}</h3>
+      {question.multiple && <p className="muted">Možnih je več odgovorov.</p>}
       {question.options.map((option, oi) => {
         const count = results.counts[qi][oi]
         const percent = results.total ? Math.round(count / results.total * 100) : 0
         return <div className="poll-result" key={oi}>
-          <div><span>{option}</span><strong>{count} ({percent} %)</strong></div>
+          <div><span>{option}</span><strong>{count} od {results.total} · {percent} %</strong></div>
           <div className="poll-bar" aria-hidden="true"><span style={{width: `${percent}%`}} /></div>
         </div>
       })}
@@ -34,7 +35,7 @@ function PollResults({results}: {results: Results}) {
 
 function PollCard({poll, onArchived}: {poll: Poll; onArchived: () => void}) {
   const [name, setName] = useState('')
-  const [answers, setAnswers] = useState<Record<number, number>>({})
+  const [answers, setAnswers] = useState<Record<number, number[]>>({})
   const [token, setToken] = useState(() => savedToken(poll.id))
   const [results, setResults] = useState<Results | null>(null)
   const [error, setError] = useState('')
@@ -53,12 +54,12 @@ function PollCard({poll, onArchived}: {poll: Poll; onArchived: () => void}) {
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('Vpiši svoje ime.'); return }
-    if (poll.questions.some((_, index) => answers[index] === undefined)) { setError('Odgovori na vsako vprašanje.'); return }
+    if (poll.questions.some((_, index) => !answers[index]?.length)) { setError('Odgovori na vsako vprašanje.'); return }
     setBusy(true); setError('')
     try {
       const result = await api<{token: string; results: Results}>(`/polls/${poll.id}/vote`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, answers: poll.questions.map((_, index) => answers[index])}),
+        body: JSON.stringify({name, answers: poll.questions.map((question, index) => question.multiple ? answers[index] : answers[index][0])}),
       })
       try { sessionStorage.setItem(tokenKey(poll.id), result.token) } catch {}
       setResults(result.results); setToken(result.token)
@@ -74,12 +75,18 @@ function PollCard({poll, onArchived}: {poll: Poll; onArchived: () => void}) {
     {results ? <><p role="status">Hvala za tvoj odgovor!</p><PollResults results={results} /><button className="secondary" disabled={busy} onClick={refreshResults}>Osveži rezultate</button></>
       : token ? <><p>Tvoj odgovor je že oddan.</p><button className="secondary" disabled={busy} onClick={refreshResults}>Prikaži rezultate</button></>
       : <form className="form" onSubmit={submit}>
-        <p className="poll-intro">Izberi en odgovor pri vsakem vprašanju. Rezultate vidiš po oddaji.</p>
+        <p className="poll-intro">Odgovori na vsa vprašanja. Rezultate vidiš po oddaji.</p>
         <label>Tvoje ime za anketo<input value={name} onChange={e => setName(e.target.value)} required maxLength={80} placeholder="Ime ali vzdevek" /></label>
         {poll.questions.map((question, qi) => <fieldset className="poll-question" key={qi}>
           <legend>{question.text}</legend>
+          <p className="poll-hint">{question.multiple ? 'Izberi enega ali več odgovorov.' : 'Izberi en odgovor.'}</p>
           {question.options.map((option, oi) => <label className="poll-option" key={oi}>
-            <input type="radio" name={`poll-${poll.id}-${qi}`} value={oi} checked={answers[qi] === oi} onChange={() => setAnswers({...answers, [qi]: oi})} required />
+            <input type={question.multiple ? 'checkbox' : 'radio'} name={`poll-${poll.id}-${qi}`} value={oi} checked={(answers[qi] || []).includes(oi)} onChange={e => {
+              const selected = answers[qi] || []
+              setAnswers({...answers, [qi]: question.multiple
+                ? e.target.checked ? [...selected, oi] : selected.filter(value => value !== oi)
+                : [oi]})
+            }} required={!question.multiple} />
             <span>{option}</span>
           </label>)}
         </fieldset>)}
@@ -111,7 +118,7 @@ export function PublicPolls() {
   </div>
 }
 
-const blankQuestion = (): Question => ({text: '', options: ['', '']})
+const blankQuestion = (): Question => ({text: '', options: ['', ''], multiple: false})
 export function AdminPolls({token}: {token: string}) {
   const [polls, setPolls] = useState<AdminPoll[]>([])
   const [title, setTitle] = useState('')
@@ -148,7 +155,7 @@ export function AdminPolls({token}: {token: string}) {
       <h4>Kdo je odgovarjal</h4>
       {poll.submissions.length ? <div className="people-list">{poll.submissions.map(vote => <div className="person" key={vote.id}>
         <strong>{vote.name}</strong><span>{date(vote.created_at)}</span>
-        <ul>{poll.questions.map((question, index) => <li key={index}>{question.text}: <strong>{question.options[vote.answers[index]]}</strong></li>)}</ul>
+        <ul>{poll.questions.map((question, index) => <li key={index}>{question.text}: <strong>{(Array.isArray(vote.answers[index]) ? vote.answers[index] as number[] : [vote.answers[index] as number]).map(option => question.options[option]).join(', ')}</strong></li>)}</ul>
       </div>)}</div> : <p className="muted">Odgovorov še ni.</p>}
     </>
   }
@@ -159,6 +166,7 @@ export function AdminPolls({token}: {token: string}) {
       <label>Naslov ankete<input value={title} onChange={e => setTitle(e.target.value)} maxLength={200} required /></label>
       {questions.map((question, qi) => <fieldset className="poll-question poll-editor" key={qi}>
         <legend>Vprašanje {qi + 1}</legend>
+        <label className="poll-option poll-mode"><input type="checkbox" checked={!!question.multiple} onChange={e => updateQuestion(qi, {...question, multiple: e.target.checked})} /><span>Dovoli več odgovorov pri tem vprašanju</span></label>
         <label>Besedilo vprašanja<input value={question.text} onChange={e => updateQuestion(qi, {...question, text: e.target.value})} maxLength={500} required /></label>
         {question.options.map((option, oi) => <label key={oi}>Odgovor {oi + 1}<input value={option} onChange={e => updateQuestion(qi, {...question, options: question.options.map((value, i) => i === oi ? e.target.value : value)})} maxLength={200} required /></label>)}
         <div className="poll-actions">

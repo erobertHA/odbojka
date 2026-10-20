@@ -402,3 +402,6 @@ footer a { display: inline-flex; min-height: 44px; align-items: center; padding:
 @media (prefers-reduced-motion: reduce) {
   button { transition: none; }
 }
+
+.poll-hint { margin: 2px 0 8px; color: var(--muted); font-size: 14px; }
+.form .poll-mode { font-weight: 600; }

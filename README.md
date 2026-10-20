@@ -112,9 +112,9 @@ V Vite development načinu se `/api` proxya na `http://localhost:8000`.
 
 Po odklepu se aktivne ankete prikažejo v vijolični kartici nad naslednjim terminom, tudi če termina ni. Če aktivnih anket ni, kartice ni. Aktivnih je lahko več anket hkrati.
 
-Na `/admin` je razdelek **Ankete**. Administrator določi naslov, od 1 do 20 vprašanj in od 2 do 20 odgovorov na vprašanje. Po objavi so vprašanja nespremenljiva; za drugačna vprašanja objavi novo anketo. Arhiviranje skrije anketo in njene rezultate uporabnikom ter ustavi glasovanje. Administrator v arhivu vidi vprašanja, datum objave/arhiviranja ter imena, odgovore in čas oddaje.
+Na `/admin` je razdelek **Ankete**. Administrator določi naslov, od 1 do 20 vprašanj in od 2 do 20 odgovorov na vprašanje. Pri vsakem vprašanju lahko označi **Dovoli več odgovorov pri tem vprašanju** (privzeto je dovoljen en odgovor). Po objavi so vprašanja nespremenljiva; za drugačna vprašanja objavi novo anketo. Arhiviranje skrije anketo in njene rezultate uporabnikom ter ustavi glasovanje. Administrator v arhivu vidi vprašanja, datum objave/arhiviranja ter imena, odgovore in čas oddaje.
 
-Uporabnik vpiše ime in izbere en odgovor pri vsakem vprašanju. Normalizirano ime lahko na isto anketo odgovori enkrat. Rezultati so skupni in ne vsebujejo imen; API jih vrne šele z naključnim žetonom, izdanim ob oddaji. Žeton je shranjen v `sessionStorage`, zato so rezultati dostopni tudi po osvežitvi istega zavihka. Brez uporabniških računov ime ostaja samoprijavljeno; anketa ne preverja identitete in ne preprečuje glasovanja pod drugim imenom.
+Uporabnik vpiše ime in pri vsakem vprašanju izbere enega ali več odgovorov, kot določi administrator. Normalizirano ime lahko na isto anketo odgovori enkrat. Rezultati so skupni in ne vsebujejo imen; API jih vrne šele z naključnim žetonom, izdanim ob oddaji. Žeton je shranjen v `sessionStorage`, zato so rezultati dostopni tudi po osvežitvi istega zavihka. Brez uporabniških računov ime ostaja samoprijavljeno; anketa ne preverja identitete in ne preprečuje glasovanja pod drugim imenom.
 
 Ob zagonu se samodejno ustvarita novi tabeli `polls` in `poll_submissions`. Obstoječih tabel in podatkov se ne spreminja. Arhiviranje anket podatkov ne izbriše. Odgovori niso vezani na rok hrambe prijav na odbojko; rok hrambe arhiva anket mora določiti organizator.
 

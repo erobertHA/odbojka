@@ -36,6 +36,7 @@ if __name__ == '__main__':
                 expect(page.get_by_role('heading', name='Ankete', exact=True)).to_be_visible()
                 page.get_by_label('Naslov ankete', exact=True).fill('Naš dogovor')
                 question = page.locator('.poll-editor').first
+                question.get_by_label('Dovoli več odgovorov pri tem vprašanju').check()
                 question.get_by_label('Besedilo vprašanja', exact=True).fill('Kateri dan?')
                 question.get_by_label('Odgovor 1', exact=True).fill('Torek')
                 question.get_by_label('Odgovor 2', exact=True).fill('Četrtek')
@@ -54,11 +55,12 @@ if __name__ == '__main__':
                 assert card.bounding_box()['y'] < 100
                 expect(card.get_by_text('Rezultati', exact=True)).not_to_be_visible()
                 card.get_by_label('Tvoje ime za anketo', exact=True).fill('Ana')
+                card.get_by_label('Torek', exact=True).check()
                 card.get_by_label('Petek', exact=True).check()
                 card.get_by_label('20:00', exact=True).check()
                 card.get_by_role('button', name='Oddaj odgovore in prikaži rezultate').click()
                 expect(card.get_by_text('Hvala za tvoj odgovor!', exact=True)).to_be_visible()
-                expect(card.get_by_text('1 (100 %)', exact=True)).to_have_count(2)
+                expect(card.get_by_text('1 od 1 · 100 %', exact=True)).to_have_count(3)
                 page.reload()
                 expect(card.get_by_text('Rezultati', exact=True)).to_be_visible()
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
